@@ -102,7 +102,7 @@ def main(argv):
 
     # Connect the redis server.
     try:
-        redis_server = redis.StrictRedis(host="172.17.216.110",
+        redis_server = redis.StrictRedis(host="127.0.0.1",
                                               port="6379",
                                               db="0")
     except Exception, e:
@@ -121,7 +121,7 @@ def main(argv):
 
             # Scores is the array containing SFW / NSFW image probabilities
             # scores[1] indicates the NSFW probability
-            print "%d. , score: %f" % (complete, scores[1])
+            print "%d. score: %f, path: %s" % (complete, scores[1], image_path)
             if scores[1] > 0.8:
                 redis_server.lpush("illegal.list", "%s#_#%f" % (scores[1])) 
 
