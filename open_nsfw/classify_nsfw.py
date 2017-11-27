@@ -102,7 +102,7 @@ def main(argv):
 
     # Connect the redis server.
     try:
-        redis_server = redis.StrictRedis(host="127.0.0.1",
+        redis_server = redis.StrictRedis(host="172.17.216.110",
                                               port="6379",
                                               db="0")
     except Exception, e:
