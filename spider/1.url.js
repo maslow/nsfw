@@ -136,7 +136,7 @@ async function main() {
                 title: 'URL:' + res,
                 url: res
             }
-            let job = q.create('URL', data).attempts(3).ttl(60 * 1000)
+            let job = q.create('URL', data).attempts(3).ttl(3 * 60 * 1000)
             await lib.kue_save(job)
         }
         should_exit = true

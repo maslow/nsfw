@@ -100,9 +100,11 @@ def main(argv):
     caffe_transformer.set_raw_scale('data', 255)  # rescale from [0, 1] to [0, 255]
     caffe_transformer.set_channel_swap('data', (2, 1, 0))  # swap channels from RGB to BGR
 
+    redis_host = os.environ.get('REDIS_HOST')
+    
     # Connect the redis server.
     try:
-        redis_server = redis.StrictRedis(host="172.17.216.110",
+        redis_server = redis.StrictRedis(host=redis_host,
                                               port="6379",
                                               db="0")
     except Exception, e:

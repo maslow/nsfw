@@ -1,8 +1,10 @@
 const path = require('path')
 
+redis_host = process.env['REDIS_HOST'] || '127.0.0.1'
+
 module.exports = {
     redis: {
-        host: '127.0.0.1',
+        host: redis_host,
         //        host: '192.168.99.100',        
         port: 6379
     },
