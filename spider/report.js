@@ -20,14 +20,14 @@ let imglogger = new console.Console(
 let redisOptions = options.redis
 let client = redis.createClient(redisOptions)
 
-
+main()
 
 async function main() {
     let try_times = 0
     let i = 0
     while (try_times < 10) {
         let ret = await getIllegalImageFromQueue()
-        if (ret) {
+        if (!ret) {
             try_times++
             console.log(`Failed to get data from redis, delaying 1s and then try again. Attempts: ${try_times}/10`)
             await Promise.delay(1000)
@@ -40,7 +40,7 @@ async function main() {
         let row = `${i}, ${imgUrlHash}, ${url1}, ${url2}, ${imgUrl}, ${imgPath}, ${score}, ${newPath}`
         console.log(row)
         imglogger.log(row)
-        client.lpush('illegal.list', ret)
+        client.lpush('illegal.list.backup', ret)
     }
 }
 
@@ -49,10 +49,9 @@ async function copyImageFile(url1, imgPath){
     let dest = `${dataPath}/report/images/${url1}`
     await fs.ensureDirAsync(dest)
     let basename = path.basename(imgPath)
-    let ext = path.extname(imgPath)
-    let name = path.join(`${dest}`, `${basename}.${ext}`)
-    await fs.copyAsync(imgPath, name)
-    return name
+    let filepath = path.join(`${dest}`, `${basename}`)
+    await fs.copyAsync(imgPath, filepath)
+    return filepath
 }
 
 async function getIllegalImageFromQueue() {
