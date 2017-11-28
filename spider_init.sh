@@ -1,10 +1,12 @@
 #!/bin/sh
-export REDIS_HOST=172.17.216.182   # You HAVE TO replace the value with your real ip addr.
 
-cd /root/nsfw && git pull origin master
-cd /root/nsfw/spider && npm install
+# You HAVE TO replace the value with your real ip addr.
+export REDIS_HOST=172.17.216.182   
+
+# Mount remote file system which is addressed by REDIS_HOST.
 mount -t nfs $REDIS_HOST:/mnt /mnt -o proto=tcp -o nolock
 
+# Pull the lastest source codes
 cd /root/nsfw && git pull origin master
 cd /root/nsfw/spider && npm install
 
