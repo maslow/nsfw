@@ -1,10 +1,16 @@
 #!/bin/sh
-export REDIS_HOST=172.17.216.182
+export REDIS_HOST=172.17.216.182   # You HAVE TO replace the value with your real ip addr.
 
-systemctl start rpcbind
-systemctl start nfs
+cd /root/nsfw && git pull origin master
+cd /root/nsfw/spider && npm install
+mount -t nfs $REDIS_HOST:/mnt /mnt -o proto=tcp -o nolock
 
 cd /root/nsfw && git pull origin master
 cd /root/nsfw/spider && npm install
 
-docker run -d -p 6379:6379 -v /mnt/redis-data:/data redis
+# Do your job here!
+
+# node img.js 1000 1000 > /img1.log &
+# node img.js 1000 1000 > /img2.log &
+# node img.js 1000 1000 > /img2.log &
+# node img.js 1000 1000 > /img4.log &
