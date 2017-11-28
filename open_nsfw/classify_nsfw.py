@@ -115,6 +115,10 @@ def main(argv):
     while True:
         try:
             ret = redis_server.rpop("ImageScannerQueue")
+            if ret is None:
+                time.sleep(1)
+                continue
+
             image_path = ret.split("#_#")[4]
             image_data = open(image_path).read()
             
@@ -132,7 +136,7 @@ def main(argv):
             time.sleep(1)
             continue
   
-
+  
         complete = complete + 1
         if complete % 50 == 0:
             t2 = time.time()
