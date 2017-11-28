@@ -125,9 +125,10 @@ def main(argv):
             # scores[1] indicates the NSFW probability
             print "%d. score: %f, path: %s" % (complete, scores[1], image_path)
             if scores[1] > 0.8:
-                redis_server.lpush("illegal.list", "%s#_#%f" % (scores[1])) 
+                redis_server.lpush("illegal.list", "%s#_#%f" % (ret, scores[1])) 
 
         except Exception, e:
+            print 'Error : ', e
             time.sleep(1)
             continue
   
