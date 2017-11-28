@@ -1,5 +1,5 @@
 #!/bin/sh
-export REDIS_HOST=172.17.216.169
+export REDIS_HOST=172.17.216.182
 
 cd /root/nsfw && git pull origin master
 mount -t nfs $REDIS_HOST:/mnt /mnt -o proto=tcp -o nolock

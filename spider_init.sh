@@ -1,5 +1,5 @@
 #!/bin/sh
-export REDIS_HOST=172.17.216.169
+export REDIS_HOST=172.17.216.182
 
 systemctl start rpcbind
 systemctl start nfs
