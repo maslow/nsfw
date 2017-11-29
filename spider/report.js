@@ -37,7 +37,7 @@ async function main() {
         try_times = 0
         let [imgUrlHash, url1, url2, imgUrl, imgPath, score] = ret.split('#_#')
         let newPath = await copyImageFile(url1, imgPath)
-        let row = `${i}, ${imgUrlHash}, ${url1}, ${url2}, ${imgUrl}, ${imgPath}, ${score}, ${newPath}`
+        let row = `${i} $ ${imgUrlHash} $ ${url1} $ ${url2} $ ${imgUrl} $ ${imgPath} $ ${score} $ ${newPath}`
         console.log(row)
         imglogger.log(row)
         client.lpush('illegal.list.backup', ret)

@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # You HAVE TO replace the value with your real ip addr.
-export REDIS_HOST=172.17.216.182   
+export REDIS_HOST=172.17.216.196
 
 # Mount remote file system which is addressed by REDIS_HOST.
 mount -t nfs $REDIS_HOST:/mnt /mnt -o proto=tcp -o nolock
@@ -13,8 +13,10 @@ npm i -g yarn
 cd /root/nsfw/spider && yarn install
 
 # Do your job here!
+node /root/nsfw/spider/img.js 1000 1000 > /img1.log & 
+node /root/nsfw/spider/img.js 1000 1000 > /img2.log &
+node /root/nsfw/spider/img.js 1000 1000 > /img3.log &
 
-# node img.js 1000 1000 > /img1.log &
-# node img.js 1000 1000 > /img2.log &
-# node img.js 1000 1000 > /img2.log &
-# node img.js 1000 1000 > /img4.log &
+# node /root/nsfw/spider/2.url.js 1000 > /2.url.log & 
+# node /root/nsfw/spider/2.url.js 1000 > /2.url.log & 
+# node /root/nsfw/spider/2.url.js 1000 > /2.url.log & 
