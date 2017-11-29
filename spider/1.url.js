@@ -94,7 +94,7 @@ async function main() {
         let duration = process.hrtime(start_at)[0]
         let total = rets.url_complete + rets.url_failed
 
-        console.log(`[1.URL.js]******************** Cost time: ${duration}s  Port: ${kueport} ******************* `)
+        console.log(`[1.URL.js]******************** Cost time: ${duration}s  ******************* `)
         console.log(`Memory: ${mem.rss / 1024 / 1024}mb ${mem.heapTotal / 1024 / 1024}mb ${mem.heapUsed / 1024 / 1024}mb`)
         console.log(`Images: ${imageCount} [${imageCount / duration}/s] NextUrls: ${nextUrlCount}`)
         console.log(`Total: ${total} [${total / duration}/s] Complete: ${rets.url_complete / duration}/s`)
