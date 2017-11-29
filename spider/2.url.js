@@ -25,7 +25,7 @@ let redisOptions = options.redis
 let client = redis.createClient(redisOptions)
 let key = options.key_next_url
 
-const c_nexturl = process.argv[2] || 100
+const c_nexturl = process.argv[2] || 1000
 
 
 let imageCount = 0
@@ -124,12 +124,6 @@ q.on("job failed", (id, result) => {
 })
 
 async function main() {
-
-    // Kue Web UI
-    // kue.app.listen(kueport, err => {
-    //     if (err) return console.error(err)
-    //     console.log('listening on port ' + kueport)
-    // })
 
     // Exit & Exception
     process

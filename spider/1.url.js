@@ -12,25 +12,24 @@ Promise.promisifyAll(redis)
 
 let start_at = process.hrtime()
 let dataPath = options.data_path
-let kueport = Math.floor(Math.random() * 10000) + 3000
+
 fs.ensureDirSync(`${dataPath}/logs`)
 let logger = new console.Console(
-    fs.createWriteStream(`${dataPath}/logs/url_failed_${kueport}.log`),
-    fs.createWriteStream(`${dataPath}/logs/url_failed_${kueport}.error.log`)
+    fs.createWriteStream(`${dataPath}/logs/url_failed.log`),
+    fs.createWriteStream(`${dataPath}/logs/url_failed.error.log`)
 )
 
-let redisOptions = options.redis
-let client = redis.createClient(redisOptions)
+let client = redis.createClient(options.redis)
 let key = options.key_original_url
 
-const c_url = process.argv[2] || 100
+const c_url = process.argv[2] || 1000
 
 let imageCount = 0
 let nextUrlCount = 0
 
 let q = kue.createQueue({
-    prefix: 'url' + kueport,
-    redis: redisOptions
+    prefix: 'url',
+    redis: options.redis
 })
 
 q.process('URL', c_url, async function (job, done) {
@@ -77,12 +76,6 @@ q.process('URL', c_url, async function (job, done) {
 })
 
 async function main() {
-
-    // Kue Web UI
-    kue.app.listen(kueport, err => {
-        if (err) return console.error(err)
-        console.log('listening on port ' + kueport)
-    })
 
     // Exit & Exception
     process

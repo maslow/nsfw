@@ -22,8 +22,8 @@ let imglogger = new console.Console(
 let redisOptions = options.redis
 let client = redis.createClient(redisOptions)
 
-const c_img = process.argv[2] || 100
-const c_slow_img = process.argv[3] || 100
+const c_img = process.argv[2] || 1000
+const c_slow_img = process.argv[3] || 1000
 
 let imageCount = 0
 let cachedCount = 0
