@@ -184,7 +184,6 @@ async function main() {
     })
 
     // Report Loop
-    let should_exit = false
     setInterval(async() => {
         let mem = process.memoryUsage()
         let rets = await statsQueue(q)
@@ -213,36 +212,28 @@ async function main() {
               Failed: ${slow_image_failed}
 
         `)
-
-        let r = rets.image_active + rets.image_inactive
-        r += rets.slow_image_active + rets.slow_image_inactive + rets.slow_image_delayed
-        if (r === 0 && should_exit)
-            process.exit(0)
-
     }, 5000)
 
     // Input Loop
     try {
-        let try_times = 0
-        while (!should_exit) {
+        while (true) {
+            let rets = await statsQueue(q)
+            
+            if (rets.image_inactive > 5000) {
+                console.log("Taking a break:  3s...")                
+                await Promise.delay(3000)
+                continue
+            }
+
             let res = await client.rpopAsync(options.key_img_url)
             if (!res) {
-                if (++try_times > 100)
-                    should_exit = true
-                console.log(`Failed to get imgurl from redis, delaying 5s and then try again. Attempts: ${try_times}/100`)
-                await Promise.delay(5000)
+                console.log(`Failed to get imgurl from redis, delaying 10s and then try again.`)
+                await Promise.delay(10 * 1000)
                 continue
             }
-            try_times = 0
-            imageCount++
-            let rets = await statsQueue(q)
-            let mem = process.memoryUsage()
 
-            if (rets.image_inactive > 1000 /* || mem.heapUsed > 600 * 1024 * 1024 */ ) {
-                await Promise.delay(3000)
-                console.log("pausing 3s...")
-                continue
-            }
+            imageCount++
+
             let [imgurl, orignurl, parentUrl] = res.split('#:_:#')
 
             parentUrl = parentUrl || orignurl

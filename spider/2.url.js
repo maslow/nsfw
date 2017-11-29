@@ -82,12 +82,6 @@ q.process('NEXTURL', c_nexturl, async function (job, done) {
             return done()
         }
 
-        // let lastUrls = lib.getNextUrls(res.text, job.data.url)
-        // if (lastUrls && lastUrls.length) {
-        //     pushLastUrls(lastUrls, job.data.url, job.data.orignurl)
-        //     lastUrlCount += lastUrls.length
-        // }
-
         await lib.saveHtml(p_des, res.text)
         await lib.cacheUrl2(urlHash, job.data.orignurl)
 
@@ -132,10 +126,10 @@ q.on("job failed", (id, result) => {
 async function main() {
 
     // Kue Web UI
-    kue.app.listen(kueport, err => {
-        if (err) return console.error(err)
-        console.log('listening on port ' + kueport)
-    })
+    // kue.app.listen(kueport, err => {
+    //     if (err) return console.error(err)
+    //     console.log('listening on port ' + kueport)
+    // })
 
     // Exit & Exception
     process
@@ -147,7 +141,6 @@ async function main() {
 
 
     // Report Loop
-    let should_exit = false
     setInterval(async() => {
         let mem = process.memoryUsage()
         let rets = await statsQueue(q)
@@ -168,32 +161,23 @@ async function main() {
               Failed:${nexturl_failed}   [${nexturl_failed / total * 100}%]
         `)
         console.log('}\n')
-
-        let r = rets.nexturl_inactive + rets.nexturl_active + rets.nexturl_delayed
-
-        if (r === 0 && should_exit)
-            process.exit(0)
     }, 5000)
 
     // Input Loop
     try {
-        let try_times = 0
-        while (!should_exit) {
-            let res = await popUrl()
-            if (!res) {
-                if (try_times++ > 100)
-                    should_exit = true
-
-                console.log(`Failed to get url from redis, delaying 5s and then try again. Attempts: ${try_times}/100`)
-                await Promise.delay(5000)
+        while (true) {
+            let rets = await statsQueue(q)
+            
+            if (rets.nexturl_inactive > 2000) {
+                console.log("Taking a break: 3s...")
+                await Promise.delay(3000)
                 continue
             }
-            try_times = 0
-            let rets = await statsQueue(q)
-            let mem = process.memoryUsage()
 
-            if (rets.nexturl_inactive > 1000 /*||mem.heapUsed>600 * 1024 * 1024*/ ) {
-                await Promise.delay(3000)
+            let res = await popUrl()
+            if (!res) {
+                console.log(`Failed to get url from redis, delaying 10s and then try again.`)
+                await Promise.delay(10 * 1000)
                 continue
             }
 
@@ -205,12 +189,9 @@ async function main() {
             let job = q.create('NEXTURL', data).attempts(2)
             await lib.kue_save(job)
         }
-
-        console.log('All urls were pushed into queue')
     } catch (err) {
         console.error(err)
     }
-
 }
 
 main()

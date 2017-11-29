@@ -95,7 +95,6 @@ async function main() {
         })
 
     // Report Loop
-    let should_exit = false
     setInterval(async() => {
         let mem = process.memoryUsage()
         let rets = await statsQueue(q)
@@ -115,22 +114,25 @@ async function main() {
               Failed: ${rets.url_failed}   [${rets.url_failed / total * 100}%]
         `)
         console.log('}\n')
-
-        let r = rets.url_inactive + rets.url_active + rets.url_delayed
-
-        if (r === 0 && should_exit)
-            process.exit(0)
     }, 5000)
 
     // Input Loop
     try {
-        let res = null
-        while (res = await client.rpopAsync(key)) {
+        while (true) {
             let rets = await statsQueue(q)
-            let mem = process.memoryUsage()
 
-            if (rets.url_inactive > 1000 || mem.heapUsed > 800 * 1024 * 1024)
-                await Promise.delay(3000)
+            if (rets.url_inactive > 2000) {
+                console.log('Taking a break: 5s...')
+                await Promise.delay(5000)
+                continue
+            }
+
+            let res = await client.rpopAsync(key)
+            if (!res) {
+                console.log("Failed to get orignal url from Redis, delay 10s then try again.")
+                await Promise.delay(10 * 1000)
+                continue
+            }
 
             let data = {
                 title: 'URL:' + res,
@@ -139,8 +141,6 @@ async function main() {
             let job = q.create('URL', data).attempts(3).ttl(3 * 60 * 1000)
             await lib.kue_save(job)
         }
-        should_exit = true
-        console.log('All urls were pushed into queue')
     } catch (err) {
         console.error(err)
     }
