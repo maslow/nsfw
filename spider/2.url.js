@@ -23,7 +23,7 @@ let logger = new console.Console(
 
 let redisOptions = options.redis
 let client = redis.createClient(redisOptions)
-let key = options.key_next_url
+let key = options.key_url_2
 
 const c_nexturl = process.argv[2] || 1000
 
@@ -201,7 +201,7 @@ function pushImgUrl(imgurls, fatherurl, rooturl) {
 function pushLastUrls(urls, fatherUrl, rootUrl) {
     urls = urls || []
     let arr = urls.map(u => `${rootUrl}#:_:#${fatherUrl}#:_:#${u}`)
-    let key = options.key_last_url
+    let key = options.key_url_3
     arr.unshift(key)
     client.lpush(arr)
 }

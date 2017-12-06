@@ -8,7 +8,7 @@ const _ = require('lodash')
 const options = require('./options.js')
 let redisOptions = options.redis
 let client = redis.createClient(redisOptions)
-let key = options.key_original_url
+let key = options.key_url_1
 
 if (process.argv.length !== 4) {
     console.error('ERROR: param missing (start end)')

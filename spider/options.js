@@ -5,12 +5,11 @@ redis_host = process.env['REDIS_HOST'] || '127.0.0.1'
 module.exports = {
     redis: {
         host: redis_host,
-        //        host: '192.168.99.100',        
         port: 6379
     },
-    key_original_url: 'original.url',
-    key_next_url: 'next.url.list',
-    key_last_url: 'last.url.list',
+    key_url_1: 'url.1',
+    key_url_2: 'url.2',
+    key_url_3: 'url.3',
     key_img_url: 'img.url',
     xlsx_file: path.join(__dirname, 'url.xlsx'),
     cached_path: path.join('/mnt/data.cache'),
