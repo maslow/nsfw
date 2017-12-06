@@ -19,7 +19,7 @@ let start = process.argv[2]
 let end = process.argv[3]
 
 let sheets = xlsx.parse(options.xlsx_file);
-let sheet_data = sheets[0].data.map(data => data[0])
+let sheet_data = sheets[0].data.map(data => `http://${data[0]}`)
 sheet_data = sheet_data.slice(start, end)
 sheet_data = _.uniq(sheet_data)
 
@@ -35,6 +35,4 @@ function pushUrl(urls, cb) {
     client.lpush(urls, cb)
 }
 
-process.on('exit', () => {
-    console.log('OK!')
-})
+process.on('exit', () => console.log('OK!'))

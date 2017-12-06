@@ -33,7 +33,7 @@ module.exports = {
         let nUrls = $("a").toArray() || []
         nextUrls = nUrls
             .map(nUrl => nUrl.attribs.href)
-            .map(nUrl => dealUrl(nUrl, 'http://' + fromUrl))
+            .map(nUrl => dealUrl(nUrl, fromUrl))
             .filter(nUrl => nUrl)
 
         return _.uniq(nextUrls)
