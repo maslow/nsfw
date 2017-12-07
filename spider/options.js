@@ -9,6 +9,7 @@ module.exports = {
     },
     sep: '___$$$___',
     depth: 2,
+    key_scanning: 'img.scanning',
     key_url: 'url',
     key_url_1: 'url',
     key_url_2: 'url',

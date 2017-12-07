@@ -114,7 +114,7 @@ def main(argv):
     complete = 0
     while True:
         try:
-            ret = redis_server.rpop("ImageScannerQueue")
+            ret = redis_server.rpop("img.scanning")
             if ret is None:
                 time.sleep(1)
                 continue

@@ -1,296 +1,169 @@
-var fs = require('fs-extra')
-var path = require('path')
-var request = require('superagent')
-const kue = require('kue')
+const fs = require('fs-extra')
+const path = require('path')
+const request = require('superagent')
 const asy = require('async')
-const domain = require('domain')
-const lib = require('./lib.js')
 const redis = require("redis")
-const options = require('./options.js')
 const Promise = require('bluebird')
-Promise.promisifyAll(fs)
+const commander = require("commander")
+const debug = require("debug")("img")
+const options = require('./options.js')
+const lib = require('./lib.js')
+
+commander.version("2.0")
+    .option('-c, --concurrency [value]', 'Concurrency Number of Requesting url', 100)
+    .option('-w, --waiting [value]', 'The Number of tasks waiting in Queue', 10)
+    .parse(process.argv)
+
+//Promise.promisifyAll(fs)
 Promise.promisifyAll(redis)
 
-let start_at = process.hrtime()
-let dataPath = options.data_path
-let kueport = Math.floor(Math.random() * 10000) + 3000
-fs.ensureDirSync(`${dataPath}/logs`)
-let imglogger = new console.Console(
-    fs.createWriteStream(`${dataPath}/logs/img_${kueport}.log`),
-    fs.createWriteStream(`${dataPath}/logs/img_${kueport}.error.log`)
-)
-let redisOptions = options.redis
-let client = redis.createClient(redisOptions)
+let client = redis.createClient(options.redis)
 
-const c_img = process.argv[2] || 1000
-const c_slow_img = process.argv[3] || 1000
+const IMAGE_DATA_PATH = path.join(options.data_path, 'images')
+fs.ensureDirSync(IMAGE_DATA_PATH)
 
-let imageCount = 0
-let cachedCount = 0
-let image_complete = 0
-let slow_image_complete = 0
-let image_failed = 0
-let slow_image_failed = 0
+const stats = {
+    skipped: 0,
+    completed: 0,
+    failed: 0,
+    cached: 0,
+    start_at: process.hrtime()
+}
 
-let q = kue.createQueue({
-    prefix: 'img' + kueport,
-    redis: redisOptions
-})
+// Create Task Queue
+const q = asy.queue(QueueWorker, commander.concurrency)
 
-q.process('IMAGE', c_img, async(job, done) => {
-    try {
-        imglogger.log(job.data.imgurl)
-        let imgUrlHash = lib.md5(job.data.imgurl)
+// Set Queue Error Handler
+q.error = QueueErrorHandler
 
-        // Deal with cache
-        let ret = await lib.getImgFromCache(imgUrlHash)
-        if (ret) {
-            cachedCount++
-            return done();
-            /*
-            try {
-                let imgfilename = `${imgUrlHash}.${ret.extname}`
-                let p_src = path.join(dataPath, 'images', ret.orignurl.replace(':', '_'), imgfilename)
-                let p_des = path.join(dataPath, 'images', job.data.orignurl.replace(':', '_'), imgfilename)
-                await fs.ensureDirAsync(path.dirname(p_des))
+// Exit & Exception
+process.on('uncaughtException', err => console.error(err))
 
-                if (fs.existsSync(p_des)) {
-                    return done()
-                }
-                if (false === fs.existsSync(p_src))
-                    p_src = path.join(options.cached_path, 'images', ret.orignurl.replace(':', '_'), imgfilename)
+// Queue Statistics Reporter Loop
+setInterval(QueueStatisticsReporter, 5000)
 
-                if (fs.existsSync(p_src)) {
-                    let stats = fs.statSync(p_src)
-                    stats.nlink < 1024 ?
-                        fs.linkSync(p_src, p_des) : fs.copySync(p_src, p_des)
-                    return done()
-                }
-            } catch (err) {
-                //console.error(err)
-                //console.log(ret)
-                return done()
-            }
-            */
+Run()
+
+async function Run() {
+    // Task-pushing Loop
+    while (true) {
+        if (q.length() > commander.waiting) {
+            await Promise.delay(1000)
+            continue
         }
 
-        // Download directly if no cache hits
-        let headers = {
-            'User-Agent': lib.getUserAgent()
+        const raw_url = await client.rpopAsync(options.key_img_url)
+        if (!raw_url) {
+            console.log("Failed to get image url from Redis, delay 10s then try again.")
+            await Promise.delay(10 * 1000)
+            continue
         }
 
-        let timeoutOptions = {
-            response: 15 * 1000,
-            deadline: 30 * 1000
-        }
-        let res = await download_image(job.data.imgurl, timeoutOptions, headers)
+        const [imgurl] = raw_url.split(options.sep)
 
-        const imgType = res.headers['content-type']
-        let ext = lib.getImgExt(imgType)
-        imgfilename = `${imgUrlHash}.${ext}`
-        let p_des = path.join(dataPath, 'images', job.data.orignurl.replace(':', '_'), imgfilename)
-        await fs.ensureDirAsync(path.dirname(p_des))
+        const task = {
+            imgurl,
+            raw_url,
+            tries: 2,
+            delay: 1000
+        }
 
-        // Last-modified strategy is deprecated, just ignore it
-        lib.cacheImgFile(imgUrlHash, res.headers['last-modified'] || "", job.data.orignurl, ext)
-        const imgLength = Number(res.headers['content-length'])
-        if (imgLength > 6 * 1024) {
-            await fs.writeFileAsync(p_des, res.body)
-            lib.SaveImageToScannerQueue(imgUrlHash, job.data.orignurl, job.data.parentUrl, job.data.imgurl, p_des)
-        }
-        done()
-    } catch (err) {
-        if (err.timeout) {
-            let slowJob = q.create("SLOW_IMAGE", {
-                title: "SlowImageURL: " + job.data.imgurl,
-                orignurl: job.data.orignurl,
-                imgurl: job.data.imgurl,
-                parentUrl: job.data.parentUrl
-            }).attempts(2)
-            await lib.kue_save(slowJob)
-            return done()
-        }
-        imglogger.error(job.data.imgurl)
-        imglogger.error(err.status || err.code || err.message)
-        return done(err)
+        q.push(task, err => err ? null : stats.completed++)
     }
-})
+}
 
-q.process('SLOW_IMAGE', c_slow_img, (job, done) => {
-    domain.create()
-        .on('error', done)
-        .run(async() => {
-            try {
-                let headers = {
-                    'User-Agent': lib.getUserAgent()
-                }
-                let timeoutOptions = {
-                    response: 30 * 1000,
-                    deadline: 120 * 1000
-                }
-                let res = await download_image(job.data.imgurl, timeoutOptions, headers)
-                let ext = lib.getImgExt(res.headers['content-type'])
+async function QueueWorker(task) {
+    debug("QueueWorker(), task %o", task)
 
-                let imgUrlHash = lib.md5(job.data.imgurl)
-                let imgfilename = `${imgUrlHash}.${ext}`
-                let p = path.join(dataPath, "images", job.data.orignurl.replace(':', '_'), imgfilename)
-                await fs.ensureDirAsync(path.dirname(p))
-                const imgLength = Number(res.headers['content-length'])
-                if (imgLength > 6 * 1024) {
-                    await fs.writeFileAsync(p, res.body)
-                    lib.SaveImageToScannerQueue(imgUrlHash, job.data.orignurl, job.data.parentUrl, job.data.imgurl, p)
-                }
-                done()
-            } catch (err) {
-                job.delay(10 * 1000).backoff(true)
-                return done(err)
-            }
-        })
-})
+    const img_url_hash = lib.md5(task.imgurl)
 
-q.on("job complete", (id, result) => {
-    kue.Job.get(id, async(err, job) => {
-        if (err) return console.log(err)
-        await lib.save_csv('images', job.data.imgurl, job.data.orignurl, job.data.parentUrl)
-        job.remove(err => {
-            if (err) return console.log(err)
-            if (job.workerId.indexOf("SLOW_IMAGE") > 0)
-                slow_image_complete++
-            else
-                image_complete++
-        })
-    })
-})
+    const response = await download_image(task.imgurl)
 
-q.on("job failed", (id, result) => {
-    kue.Job.get(id, async(err, job) => {
-        if (err) return console.log(err)
-        job.remove(err => {
-            if (err) return console.log(err)
-            if (job.workerId.indexOf("SLOW_IMAGE") > 0)
-                slow_image_failed++
-                else
-                    image_failed++
-        })
-    })
-})
+    // Ignore images whose file-size is less than 6 * 1024 bytes
+    const img_length = Number(response.headers['content-length'])
+    if (img_length <= 6 * 1024) {
+        debug("QueueWorker(), image raw url: %s", task.raw_url)
+        stats.skipped++
+        return
+    }
 
-async function main() {
+    // Ignore images not have an legal extension
+    const img_file_ext = get_image_ext(response.headers['content-type'])
+    if (!img_file_ext) {
+        debug("QueueWorker(), content-type: %s, image url: %s", response.headers['content-type'], task.imgurl)
+        stats.skipped++
+        return
+    }
 
-    // Kue Web UI
-    kue.app.listen(kueport, err => {
-        if (err) return console.error(err)
-        console.log('listening on port ' + kueport)
-    })
+    // Write image data to file
+    const img_file_path = path.join(IMAGE_DATA_PATH, `${img_url_hash}.${img_file_ext}`)
+    await fs.writeFile(img_file_path, response.body)
+    debug("QueueWorker() > Write image to file successfully")
 
-    // Report Loop
-    setInterval(async() => {
-        let mem = process.memoryUsage()
-        let rets = await statsQueue(q)
-        let duration = process.hrtime(start_at)[0]
-        let total = image_complete + image_failed
+    // Push image information to Scanner Queue
+    push_image_to_scanner_queue(task.raw_url, img_file_path)
+    debug("QueueWorker() > Push image information to Scanner Queue successfully")
+}
 
-        console.log(`******************** Cost time: ${duration}s  Port: ${kueport} ******************* `)
-        console.log(`Memory: ${mem.rss / 1024 / 1024}mb ${mem.heapTotal / 1024 / 1024}mb ${mem.heapUsed / 1024 / 1024}mb`)
-        console.log(`Images: ${total} [${total / duration}/s]`)
-        console.log(`Complete: ${image_complete / duration}/s`)
-        console.log(`Cache Hits: ${cachedCount} [${cachedCount / image_complete * 100}%]`)
-        console.log(`
+function QueueErrorHandler(err, task) {
+    if (task.tries-- > 0)
+        return setTimeout(() => q.push(task), task.delay || 0)
+    else
+        stats.failed++
 
-    [Image Queue]
-            Inactive: ${rets.image_inactive}
-              Active: ${rets.image_active}
-             Delayed: ${rets.image_delayed}
-            Complete: ${image_complete}  [${image_complete / total * 100}%]
-              Failed: ${image_failed}   [${image_failed / total * 100}%]
-
-    [Slow Image Queue]
-            Inactive: ${rets.slow_image_inactive}
-              Active: ${rets.slow_image_active}
-             Delayed: ${rets.slow_image_delayed}
-            Complete: ${slow_image_complete}
-              Failed: ${slow_image_failed}
-
-        `)
-    }, 5000)
-
-    // Input Loop
-    try {
-        while (true) {
-            let rets = await statsQueue(q)
-            
-            if (rets.image_inactive > 5000) {
-                console.log("Taking a break:  3s...")                
-                await Promise.delay(3000)
-                continue
-            }
-
-            let res = await client.rpopAsync(options.key_img_url)
-            if (!res) {
-                console.log(`Failed to get imgurl from redis, delaying 10s and then try again.`)
-                await Promise.delay(10 * 1000)
-                continue
-            }
-
-            imageCount++
-
-            let [imgurl, orignurl, parentUrl] = res.split('#:_:#')
-
-            parentUrl = parentUrl || orignurl
-            let data = {
-                title: 'IMAGE:' + imgurl,
-                imgurl,
-                orignurl,
-                parentUrl
-            }
-            let job = q.create('IMAGE', data)
-            await lib.kue_save(job)
-        }
-    } catch (err) {
+    if (!err.status && !err.code && !err.statusCode && !err.host)
         console.error(err)
+    else
+        debug("QueueErrorHandler() , Error: %O , Task: %O)", err, task)
+}
+
+function QueueStatisticsReporter() {
+    let mem = process.memoryUsage()
+    let duration = process.hrtime(stats.start_at)[0]
+
+    console.log(`[IMG.js]******************** Cost time: ${duration}s  ******************* `)
+    console.log(`Memory: ${mem.rss / 1024 / 1024}mb ${mem.heapTotal / 1024 / 1024}mb ${mem.heapUsed / 1024 / 1024}mb`)
+    console.log(`Running: ${q.running()} Waiting: ${q.length()}`)
+    console.log(`Completed: ${stats.completed} [${stats.completed / duration}/s] `)
+    console.log(`Failed: ${stats.failed} [${stats.failed / duration}/s] `)
+    console.log(`Cached: ${stats.cached} [${stats.cached / duration}/s] `)
+}
+
+function download_image(imgurl) {
+    const headers = {
+        'User-Agent': lib.getUserAgent()
     }
-}
 
-main()
+    const timeoutOptions = {
+        response: 15 * 1000,
+        deadline: 60 * 1000
+    }
 
-process
-    .on('exit', code => {
-        let end_at = process.hrtime(start_at)
-        console.log(end_at[0] + 's, ' + end_at[1] + 'ns')
-    })
-    .on('uncaughtException', err => console.error(err))
-
-
-function statsQueue(queue) {
-    return new Promise((resolve, reject) => {
-        asy.parallel({
-            image_inactive: cb => queue.inactiveCount('IMAGE', cb),
-            image_failed: cb => queue.failedCount('IMAGE', cb),
-            image_active: cb => queue.activeCount('IMAGE', cb),
-            image_complete: cb => queue.completeCount('IMAGE', cb),
-            image_delayed: cb => queue.delayedCount('IMAGE', cb),
-
-            slow_image_inactive: cb => queue.inactiveCount('SLOW_IMAGE', cb),
-            slow_image_failed: cb => queue.failedCount('SLOW_IMAGE', cb),
-            slow_image_active: cb => queue.activeCount('SLOW_IMAGE', cb),
-            slow_image_complete: cb => queue.completeCount('SLOW_IMAGE', cb),
-            slow_image_delayed: cb => queue.delayedCount('SLOW_IMAGE', cb),
-
-        }, (err, rets) => {
-            if (err) return reject(err)
-            resolve(rets)
-        })
-    })
-}
-
-function download_image(imgurl, timeout, headers) {
     return new Promise((resolve, reject) => {
         request.get(imgurl)
             .ok(res => res.status === 200 || res.status === 304)
-            .set(headers).timeout(timeout)
+            .set(headers).timeout(timeoutOptions)
             .end((err, res) => {
                 if (err) return reject(err)
                 resolve(res)
             })
+    })
+}
+
+function get_image_ext(content_type) {
+    try {
+        let ext = content_type.split('/').pop()
+        if (ext != 'jpg' || ext != 'jpeg' || ext != 'png' || ext != 'gif' || ext != 'bmp')
+            ext = 'jpg'
+        return ext
+    } catch (err) {
+        return null
+    }
+}
+
+function push_image_to_scanner_queue(image_raw_url, image_path) {
+    const task = `${image_path}${options.seq}${image_raw_url}`
+    client.lpush(options.key_scanning, task, (err, ret) => {
+        if (err) console.log(err)
     })
 }

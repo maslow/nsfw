@@ -5,8 +5,6 @@ const Promise = require('bluebird')
 const asy = require('async')
 const commander = require("commander")
 
-Promise.promisifyAll(redis)
-
 const lib = require('./lib.js')
 const options = require('./options.js')
 
@@ -15,6 +13,7 @@ commander.version("2.0")
     .option('-w, --waiting [value]', 'The Number of tasks waiting in Queue', 10)
     .parse(process.argv)
 
+Promise.promisifyAll(redis)
 
 let client = redis.createClient(options.redis)
 
@@ -67,7 +66,6 @@ async function Run() {
 
         q.push(task, err => err ? null : stats.completed++)
     }
-    console.log("Done!")
 }
 
 async function QueueWorker(task) {
