@@ -1,87 +1,78 @@
-const fs = require('fs-extra')
 const path = require('path')
 const request = require('superagent')
-const kue = require('kue')
 const redis = require("redis")
 const Promise = require('bluebird')
 const asy = require('async')
-Promise.promisifyAll(fs)
+const commander = require("commander")
+
 Promise.promisifyAll(redis)
 
 const lib = require('./lib.js')
 const options = require('./options.js')
 
-let start_at = process.hrtime()
-let dataPath = options.data_path
+commander.version("2.0")
+    .option('-c, --concurrency [value]', 'Concurrency Number of Requesting url', 100)
+    .option('-w, --waiting [value]', 'The Number of tasks waiting in Queue', 10)
+    .parse(process.argv)
 
-fs.ensureDirSync(`${dataPath}/logs`)
-let logger = new console.Console(
-    fs.createWriteStream(`${dataPath}/logs/url_failed.log`),
-    fs.createWriteStream(`${dataPath}/logs/url_failed.error.log`)
-)
 
 let client = redis.createClient(options.redis)
 
-const c_url = process.argv[2] || 1000
-
-let completed = 0
-let failed = 0
-let imageCount = 0
-let nextUrlCount = 0
+const stats = {
+    completed: 0,
+    failed: 0,
+    imageCount: 0,
+    nextUrlCount: 0,
+    start_at: process.hrtime()
+}
 
 // Create Task Queue
-const q = asy.queue(worker, c_url)
+const q = asy.queue(QueueWorker, commander.concurrency)
 
-async function main() {
-    // Exit & Exception
-    process.on('uncaughtException', err => console.error(err))
+// Set Queue Error Handler
+q.error = QueueErrorHandler
 
-    // Report Loop
-    setInterval(async () => {
-        let mem = process.memoryUsage()
-        let duration = process.hrtime(start_at)[0]
+// Exit & Exception
+process.on('uncaughtException', err => console.error(err))
 
-        console.log(`[1.URL.js]******************** Cost time: ${duration}s  ******************* `)
-        console.log(`Memory: ${mem.rss / 1024 / 1024}mb ${mem.heapTotal / 1024 / 1024}mb ${mem.heapUsed / 1024 / 1024}mb`)
-        console.log(`Running: ${q.running()} Waiting: ${q.length()}`)
-        console.log(`Completed: ${completed} [${completed / duration}/s] `)
-        console.log(`Failed: ${failed} [${failed / duration}/s] `)
-        console.log(`Images: ${imageCount} [${imageCount / duration}/s] `)
-        console.log(`NextUrls: ${nextUrlCount} [${nextUrlCount / duration}/s] `)
-    }, 5000)
+// Queue Statistics Reporter Loop
+setInterval(QueueStatisticsReporter, 5000)
 
+Run()
+
+async function Run() {
+    // Task-pushing Loop
     while (true) {
-        if (q.length() > 100) {
+        if (q.length() > commander.waiting) {
             await Promise.delay(1000)
             continue
         }
 
         const raw_url = await client.rpopAsync(options.key_url)
-
         if (!raw_url) {
             console.log("Failed to get orignal url from Redis, delay 10s then try again.")
             await Promise.delay(10 * 1000)
             continue
         }
-        const arr = raw_url.split(options.sep)
-        const depth = arr.length
+
+        const [url0] = raw_url.split(options.sep)
+        const depth = getRawUrlDepth(raw_url)
 
         const task = {
-            url: arr[0],
+            url: url0,
             raw_url,
             tries: 2 / depth | 0,
             delay: 2 / depth * 1000 | 0
         }
 
-        q.push(task, err => err ? null : completed++)
+        q.push(task, err => err ? null : stats.completed++)
     }
+    console.log("Done!")
 }
 
-main()
-
-async function worker(job) {
+async function QueueWorker(task) {
     // Request the Url
-    let res = await request.get(job.url)
+    let res = await request.get(task.url)
         .ok(res => res.status === 200)
         .set('User-Agent', lib.getUserAgent())
         .timeout({
@@ -93,39 +84,46 @@ async function worker(job) {
         return
 
     // Get & Push NextUrls
-    const depth = getRawUrlDepth(job.raw_url)
-    if(depth < options.depth){
-        let nextUrls = lib.getNextUrls(res.text, job.url)
+    const depth = getRawUrlDepth(task.raw_url)
+    if (depth < options.depth) {
+        let nextUrls = lib.getNextUrls(res.text, task.url)
         if (nextUrls && nextUrls.length) {
-            pushNextUrls(nextUrls, job.raw_url)
-            nextUrlCount += nextUrls.length
+            pushNextUrls(nextUrls, task.raw_url)
+            stats.nextUrlCount += nextUrls.length
         }
     }
 
-    // Save Html to File
-    // let dirname = job.url.replace(':', '_')
-    // let p = path.join(dataPath, "htmls", dirname)
-    // let filepath = path.join(p, `${dirname}.html`)
-    // await lib.saveHtml(filepath, res.text)
-
     // Get & Push Images
-    let imgurls = lib.getImages(res.text, job.url)
+    let imgurls = lib.getImages(res.text, task.url)
     if (imgurls && imgurls.length) {
-        pushImgUrl(imgurls, job.raw_url)
-        imageCount += imgurls.length
+        pushImgUrl(imgurls, task.raw_url)
+        stats.imageCount += imgurls.length
     }
-
 }
 
-q.error = function (err, task) {
+function QueueErrorHandler(err, task) {
     if (task.tries-- > 0)
         return setTimeout(() => q.push(task), task.delay || 0)
     else
-        failed++
+        stats.failed++
 
     if (!err.status && !err.code && !err.statusCode && !err.host)
         console.error(err)
 }
+
+function QueueStatisticsReporter() {
+    let mem = process.memoryUsage()
+    let duration = process.hrtime(stats.start_at)[0]
+
+    console.log(`[URL.js]******************** Cost time: ${duration}s  ******************* `)
+    console.log(`Memory: ${mem.rss / 1024 / 1024}mb ${mem.heapTotal / 1024 / 1024}mb ${mem.heapUsed / 1024 / 1024}mb`)
+    console.log(`Running: ${q.running()} Waiting: ${q.length()}`)
+    console.log(`Completed: ${stats.completed} [${stats.completed / duration}/s] `)
+    console.log(`Failed: ${stats.failed} [${stats.failed / duration}/s] `)
+    console.log(`Images: ${stats.imageCount} [${stats.imageCount / duration}/s] `)
+    console.log(`NextUrls: ${stats.nextUrlCount} [${stats.nextUrlCount / duration}/s] `)
+}
+
 function pushImgUrl(img_urls, url_str) {
     imgurls = imgurls || []
     let arr = img_urls.map(img_url => `${img_url}${options.sep}${url_str}`)
