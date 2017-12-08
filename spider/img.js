@@ -7,21 +7,24 @@ const Promise = require('bluebird')
 const commander = require("commander")
 const debug = require("debug")("img")
 const options = require('./options.js')
-const lib = require('./lib.js')
+const tools = require('./tools.js')
 
+// Command Line Parameters Parsing
 commander.version("2.0")
     .option('-c, --concurrency [value]', 'Concurrency Number of Requesting url', 100)
     .option('-w, --waiting [value]', 'The Number of tasks waiting in Queue', 10)
     .parse(process.argv)
 
-//Promise.promisifyAll(fs)
 Promise.promisifyAll(redis)
 
-let client = redis.createClient(options.redis)
+// New a Redis Client
+const client = redis.createClient(options.redis)
 
+// Ensure IMAGE_DATA_PATH exists
 const IMAGE_DATA_PATH = path.join(options.data_path, 'images')
 fs.ensureDirSync(IMAGE_DATA_PATH)
 
+// Statstistic Status
 const stats = {
     skipped: 0,
     completed: 0,
@@ -72,10 +75,14 @@ async function Run() {
     }
 }
 
+/**************************************************************/
+/******************* Queue relevant Functions *****************/
+/**************************************************************/
+
 async function QueueWorker(task) {
     debug("QueueWorker(), task %o", task)
 
-    const img_url_hash = lib.md5(task.imgurl)
+    const img_url_hash = tools.md5(task.imgurl)
 
     const response = await download_image(task.imgurl)
 
@@ -118,8 +125,8 @@ function QueueErrorHandler(err, task) {
 }
 
 function QueueStatisticsReporter() {
-    let mem = process.memoryUsage()
-    let duration = process.hrtime(stats.start_at)[0]
+    const mem = process.memoryUsage()
+    const duration = process.hrtime(stats.start_at)[0]
 
     console.log(`[IMG.js]******************** Cost time: ${duration}s  ******************* `)
     console.log(`Memory: ${mem.rss / 1024 / 1024}mb ${mem.heapTotal / 1024 / 1024}mb ${mem.heapUsed / 1024 / 1024}mb`)
@@ -129,9 +136,13 @@ function QueueStatisticsReporter() {
     console.log(`Cached: ${stats.cached} [${stats.cached / duration}/s] `)
 }
 
+/**************************************************************/
+/******************** Image-dealing Functions *******************/
+/**************************************************************/
+
 function download_image(imgurl) {
     const headers = {
-        'User-Agent': lib.getUserAgent()
+        'User-Agent': tools.get_user_agent()
     }
 
     const timeoutOptions = {
@@ -152,7 +163,7 @@ function download_image(imgurl) {
 
 function get_image_ext(content_type) {
     try {
-        let ext = content_type.split('/').pop()
+        const ext = content_type.split('/').pop()
         if (ext != 'jpg' || ext != 'jpeg' || ext != 'png' || ext != 'gif' || ext != 'bmp')
             ext = 'jpg'
         return ext

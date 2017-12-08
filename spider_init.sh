@@ -13,11 +13,11 @@ npm i -g yarn
 cd /root/nsfw/spider && yarn install
 
 # Do your job here!
-node /root/nsfw/spider/img.js 1000 1000 > /img1.log & 
-node /root/nsfw/spider/img.js 1000 1000 > /img2.log &
-node /root/nsfw/spider/img.js 1000 1000 > /img3.log &
+node /root/nsfw/spider/img.js -c 1000 -w 1000 > /img1.log & 
+node /root/nsfw/spider/img.js -c 1000 -w 1000 > /img2.log &
+node /root/nsfw/spider/img.js -c 1000 -w 1000 > /img3.log &
 
-# node /root/nsfw/spider/2.url.js 1000 > /1.2.url.log & 
-# node /root/nsfw/spider/2.url.js 1000 > /2.2.url.log & 
-# node /root/nsfw/spider/2.url.js 1000 > /3.2.url.log & 
-# node /root/nsfw/spider/2.url.js 1000 > /4.2.url.log & 
+# node /root/nsfw/spider/url.js -c 1000 -w 100  > /url1.log & 
+# node /root/nsfw/spider/url.js -c 1000 -w 100  > /url2.log & 
+# node /root/nsfw/spider/url.js -c 1000 -w 100  > /url3.log & 
+# node /root/nsfw/spider/url.js -c 1000 -w 100  > /url4.log & 

@@ -1,38 +1,34 @@
-const lib = require("./lib.js")
-const cheerio = require("cheerio")
-const fs = require("fs-extra")
-const path = require("path")
 const xlsx = require("node-xlsx").default
 const redis = require("redis")
 const _ = require('lodash')
+const commander = require('commander')
 const options = require('./options.js')
-let redisOptions = options.redis
-let client = redis.createClient(redisOptions)
-let key = options.key_url
 
-if (process.argv.length !== 4) {
-    console.error('ERROR: param missing (start end)')
-    process.exit(1)
-}
+// Command Line Paramenters Parsing
+commander
+    .version("2.0")
+    .option("-s, --start [value]", "Start Position (processing from)", 0)
+    .option("-e, --end [value]", "End Position, -1 indicate the tail of url list", -1)
+    .parse(process.argv)
 
-let start = process.argv[2]
-let end = process.argv[3]
+const start = commander.start
+const end = commander.end
+    
+// New a Redis Client
+const client = redis.createClient(options.redis)
 
-let sheets = xlsx.parse(options.xlsx_file);
-let sheet_data = sheets[0].data.map(data => `http://${data[0]}`)
-sheet_data = sheet_data.slice(start, end)
-sheet_data = _.uniq(sheet_data)
+// Load & Parse URL LIST
+const sheets = xlsx.parse(options.xlsx_file);
+let urls = sheets[0].data.map(data => `http://${data[0]}`)
+urls = urls.slice(start, end)
+urls = _.uniq(urls)
 
-pushUrl(sheet_data, (err, res) => {
+// Push urls to URL QUEUE (in redis)
+urls.unshift(options.key_url)
+client.lpush(urls, (err, res) => {
     if (err) return console.log("PushErr: " + err)
     console.log(res + " urls push success!")
     process.exit(0)
 })
-
-function pushUrl(urls, cb) {
-    urls = urls || []
-    urls.unshift(key)
-    client.lpush(urls, cb)
-}
 
 process.on('exit', () => console.log('OK!'))

@@ -2,12 +2,15 @@ const path = require('path')
 const request = require('superagent')
 const redis = require("redis")
 const Promise = require('bluebird')
+const cheerio = require('cheerio')
+const _ = require('lodash')
 const asy = require('async')
 const commander = require("commander")
 
-const lib = require('./lib.js')
+const tools = require('./tools.js')
 const options = require('./options.js')
 
+// Command Line Parameters Parsing
 commander.version("2.0")
     .option('-c, --concurrency [value]', 'Concurrency Number of Requesting url', 100)
     .option('-w, --waiting [value]', 'The Number of tasks waiting in Queue', 10)
@@ -15,8 +18,10 @@ commander.version("2.0")
 
 Promise.promisifyAll(redis)
 
-let client = redis.createClient(options.redis)
+// New a Redis Client
+const client = redis.createClient(options.redis)
 
+// Statstistic Status
 const stats = {
     completed: 0,
     failed: 0,
@@ -55,7 +60,7 @@ async function Run() {
         }
 
         const [url0] = raw_url.split(options.sep)
-        const depth = getRawUrlDepth(raw_url)
+        const depth = get_raw_url_depth(raw_url)
 
         const task = {
             url: url0,
@@ -68,11 +73,15 @@ async function Run() {
     }
 }
 
+/**************************************************************/
+/******************* Queue relevant Functions *****************/
+/**************************************************************/
+
 async function QueueWorker(task) {
     // Request the Url
-    let res = await request.get(task.url)
+    const res = await request.get(task.url)
         .ok(res => res.status === 200)
-        .set('User-Agent', lib.getUserAgent())
+        .set('User-Agent', tools.get_user_agent())
         .timeout({
             response: 30 * 1000,
             deadline: 60 * 1000
@@ -82,19 +91,19 @@ async function QueueWorker(task) {
         return
 
     // Get & Push NextUrls
-    const depth = getRawUrlDepth(task.raw_url)
+    const depth = get_raw_url_depth(task.raw_url)
     if (depth < options.depth) {
-        let nextUrls = lib.getNextUrls(res.text, task.url)
+        const nextUrls = retrieve_sub_urls(res.text, task.url)
         if (nextUrls && nextUrls.length) {
-            pushNextUrls(nextUrls, task.raw_url)
+            push_sub_urls(nextUrls, task.raw_url)
             stats.nextUrlCount += nextUrls.length
         }
     }
 
     // Get & Push Images
-    let imgurls = lib.getImages(res.text, task.url)
+    const imgurls = retrieve_image_urls(res.text, task.url)
     if (imgurls && imgurls.length) {
-        pushImgUrl(imgurls, task.raw_url)
+        push_image_urls(imgurls, task.raw_url)
         stats.imageCount += imgurls.length
     }
 }
@@ -110,8 +119,8 @@ function QueueErrorHandler(err, task) {
 }
 
 function QueueStatisticsReporter() {
-    let mem = process.memoryUsage()
-    let duration = process.hrtime(stats.start_at)[0]
+    const mem = process.memoryUsage()
+    const duration = process.hrtime(stats.start_at)[0]
 
     console.log(`[URL.js]******************** Cost time: ${duration}s  ******************* `)
     console.log(`Memory: ${mem.rss / 1024 / 1024}mb ${mem.heapTotal / 1024 / 1024}mb ${mem.heapUsed / 1024 / 1024}mb`)
@@ -122,21 +131,48 @@ function QueueStatisticsReporter() {
     console.log(`NextUrls: ${stats.nextUrlCount} [${stats.nextUrlCount / duration}/s] `)
 }
 
-function pushImgUrl(img_urls, url_str) {
-    imgurls = imgurls || []
-    let arr = img_urls.map(img_url => `${img_url}${options.sep}${url_str}`)
-    arr.unshift(options.key_img_url)
-    client.lpush(arr)
+/**************************************************************/
+/******************** Url-dealing Functions *******************/
+/**************************************************************/
+
+function retrieve_sub_urls(html_text, fromUrl) {
+    const $ = cheerio.load(html_text)
+    const nUrls = $("a").toArray() || []
+    nextUrls = nUrls
+        .map(nUrl => nUrl.attribs.href)
+        .map(nUrl => tools.resolve_url(nUrl, fromUrl))
+        .filter(nUrl => nUrl)
+
+    return _.uniq(nextUrls)
 }
 
-function pushNextUrls(urls, url_str) {
-    urls = urls || []
-    let arr = urls.map(u => `${u}${options.sep}${url_str}`)
-    let key = options.key_url
-    arr.unshift(key)
-    client.lpush(arr)
+function retrieve_image_urls(html_text, fromUrl) {
+    const $ = cheerio.load(html_text)
+    const imgs = $("img").toArray() || []
+    imgurls = imgs
+        .map(img => img.attribs.src)
+        .map(img => tools.resolve_url(img, fromUrl))
+        .filter(img => img)
+
+    return _.uniq(imgurls)
 }
 
-function getRawUrlDepth(raw_url) {
+function push_image_urls(img_urls, url_str) {
+    if (!img_urls || !img_urls.length)
+        return
+    const params = img_urls.map(img_url => `${img_url}${options.sep}${url_str}`)
+    params.unshift(options.key_img_url)
+    client.lpush(params)
+}
+
+function push_sub_urls(urls, url_str) {
+    if (!urls || !urls.length)
+        return
+    const params = urls.map(u => `${u}${options.sep}${url_str}`)
+    params.unshift(options.key_url)
+    client.lpush(params)
+}
+
+function get_raw_url_depth(raw_url) {
     return raw_url.split(options.sep).length
 }
