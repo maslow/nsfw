@@ -1,13 +1,13 @@
-#Structure:
+# Structure
   - open_nsfw    # 图形扫描算法
   - spider       # 爬取&下载图片
   - aliyun_shell       # 阿里云部署集群的辅助shell(本地部署不需要这个)
 
 
-# Spider:
+# Spider
     0. options.js 是spider的全局配置文件
-    1. 运行node import.js -s 0 -e 10000, 将从excel文件中导入url列表到redis中, 参数请运行node url.js --help查看
-    2. 运行node url.js -c 100 -w 100, 开始爬url以及产生的子url, 将抓取的图片url存到redis队列, 参数请运行node url.js --help查看
+    1. 运行node import.js -s 0 -e 10000, 将从excel文件中导入url列表到redis中, 参考node url.js --help
+    2. 运行node url.js -c 100 -w 100, 开始爬url及子url, 将抓取的图片url存到redis中, 参考node url.js --help
     3. 运行node img.js -c 100 -w 100, 开始下载队列中的图片, 并将成功下载的图片信息加入到待扫描队列
     4. 接着运行Open_nsfw中的扫描程序, 参考下面
 
