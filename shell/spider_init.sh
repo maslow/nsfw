@@ -9,6 +9,7 @@ mount -t nfs $REDIS_HOST:/mnt /mnt -o proto=tcp -o nolock
 # Pull the lastest source codes
 cd /root/nsfw && git pull origin master
 
+# install dependencies
 npm i -g yarn
 cd /root/nsfw/spider && yarn install
 

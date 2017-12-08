@@ -23,7 +23,7 @@ const client = redis.createClient(options.redis)
 // Ensure PATHs exists
 const IMAGE_DATA_PATH = path.join(options.data_path, 'images')
 fs.ensureDirSync(IMAGE_DATA_PATH)
-const IMAGE_CACHE_PATH = path.join(options.data_path, 'image.cache')
+const IMAGE_CACHE_PATH = path.join(options.data_path, 'images.cache')
 fs.ensureDirSync(IMAGE_CACHE_PATH)
 
 // Statstistic Status
