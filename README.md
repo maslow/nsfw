@@ -1,13 +1,18 @@
 # Structure
   - spider       # 爬取&下载图片
-    0. options.js, spider的全局配置文件
-    1. import.js, 导入urls到redis队列, 参考`node url.js --help`
-    2. url.js, 爬urls, 抓取图片url存到redis中, 参考`node url.js --help`
-    3. img.js, 下载redis中的图片, 并加入到`待扫描队列`
-    4. report.js, 导出扫描的结果
+    1. options.js, spider的全局配置文件
+    2. import.js, 导入urls到redis队列, 参考`node url.js --help`
+    3. url.js, 爬urls, 抓取图片url存到redis中, 参考`node url.js --help`
+    4. img.js, 下载redis中的图片, 并加入到`待扫描队列`
+    5. report.js, 导出扫描的结果
 
   - open_nsfw    # 图形扫描算法
-  - aliyun_shell      # 阿里云部署集群的辅助shell(本地部署不需要这个)
+    1. run.sh, 启动脚本
+
+  - cluster_shell    # 部署集群的辅助shell(本地单机部署不需要看这个)
+    1. master.sh, 主节点部署(redis, nfs)
+    2. spider_init.sh, 爬虫节点部署
+    3. scanner_init.sh, 扫描节点部署
 
 # Environment Preparation (Local Host)
 ```shell
