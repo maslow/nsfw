@@ -5,7 +5,7 @@ const asy = require('async')
 const redis = require("redis")
 const Promise = require('bluebird')
 const commander = require("commander")
-const debug = require("debug")("img")
+const debug = require("debug")
 const options = require('./options.js')
 const tools = require('./tools.js')
 
@@ -20,9 +20,11 @@ Promise.promisifyAll(redis)
 // New a Redis Client
 const client = redis.createClient(options.redis)
 
-// Ensure IMAGE_DATA_PATH exists
+// Ensure PATHs exists
 const IMAGE_DATA_PATH = path.join(options.data_path, 'images')
 fs.ensureDirSync(IMAGE_DATA_PATH)
+const IMAGE_CACHE_PATH = path.join(options.data_path, 'image.cache')
+fs.ensureDirSync(IMAGE_CACHE_PATH)
 
 // Statstistic Status
 const stats = {
@@ -80,60 +82,78 @@ async function Run() {
 /**************************************************************/
 
 async function QueueWorker(task) {
-    debug("QueueWorker(), task %o", task)
+    const _trace = debug('img:worker')
+    _trace("Start: task %o", task)
 
     const img_url_hash = tools.md5(task.imgurl)
 
+    // Check if cached
+    const cached = await get_image_cached(task.imgurl)
+    if (cached)
+        return stats.cached++
+
+    // Download Image
     const response = await download_image(task.imgurl)
 
     // Ignore images whose file-size is less than 6 * 1024 bytes
-    const img_length = Number(response.headers['content-length'])
-    if (img_length <= 6 * 1024) {
-        debug("QueueWorker(), image raw url: %s", task.raw_url)
+    const image_length = Number(response.headers['content-length'])
+    if (image_length <= 6 * 1024) {
+        _trace("Ignore! length: %d, image raw url: %s", image_length, task.raw_url)
         stats.skipped++
         return
     }
 
     // Ignore images not have an legal extension
-    const img_file_ext = get_image_ext(response.headers['content-type'])
-    if (!img_file_ext) {
-        debug("QueueWorker(), content-type: %s, image url: %s", response.headers['content-type'], task.imgurl)
+    const image_file_ext = get_image_ext(response.headers['content-type'])
+    if (!image_file_ext) {
+        _trace("Ignore! content-type: %s, image url: %s", response.headers['content-type'], task.imgurl)
         stats.skipped++
         return
     }
 
     // Write image data to file
-    const img_file_path = path.join(IMAGE_DATA_PATH, `${img_url_hash}.${img_file_ext}`)
-    await fs.writeFile(img_file_path, response.body)
-    debug("QueueWorker() > Write image to file successfully")
+    const image_file_path = await write_image_file(task.imgurl, image_file_ext, response.body)
+    _trace("Write image to file successfully")
+
+    // Cahce it
+    await cache_image(task.imgurl)
 
     // Push image information to Scanner Queue
-    push_image_to_scanner_queue(task.raw_url, img_file_path)
-    debug("QueueWorker() > Push image information to Scanner Queue successfully")
+    push_image_to_scanner_queue(task.raw_url, image_file_path)
+    _trace("Push image information to Scanner Queue successfully")
 }
 
 function QueueErrorHandler(err, task) {
-    if (task.tries-- > 0)
+    const _trace = debug('img:error')
+    const _try = debug('img:error:failed')
+
+    _trace('Error: %O, Task: %o', err, task)
+
+    if (task.tries-- > 0) {
+        _try("Trying, task: %o", task)
         return setTimeout(() => q.push(task), task.delay || 0)
-    else
+    } else {
+        _try("Failed, task: %o", task)
         stats.failed++
+    }
 
     if (!err.status && !err.code && !err.statusCode && !err.host)
         console.error(err)
     else
-        debug("QueueErrorHandler() , Error: %O , Task: %O)", err, task)
+        debug('img:error:http')("Http error: %O, task: %o", err, task)
 }
 
 function QueueStatisticsReporter() {
     const mem = process.memoryUsage()
     const duration = process.hrtime(stats.start_at)[0]
+    const total = stats.completed + stats.failed
 
     console.log(`[IMG.js]******************** Cost time: ${duration}s  ******************* `)
     console.log(`Memory: ${mem.rss / 1024 / 1024}mb ${mem.heapTotal / 1024 / 1024}mb ${mem.heapUsed / 1024 / 1024}mb`)
     console.log(`Running: ${q.running()} Waiting: ${q.length()}`)
-    console.log(`Completed: ${stats.completed} [${stats.completed / duration}/s] `)
-    console.log(`Failed: ${stats.failed} [${stats.failed / duration}/s] `)
-    console.log(`Cached: ${stats.cached} [${stats.cached / duration}/s] `)
+    console.log(`Total: ${total} [${total / duration}/s] `)
+    console.log(`Failed: ${stats.failed} (${stats.failed / total * 100}%) `)
+    console.log(`Cached: ${stats.cached} (${stats.cached / total * 100}%) `)
 }
 
 /**************************************************************/
@@ -162,19 +182,46 @@ function download_image(imgurl) {
 }
 
 function get_image_ext(content_type) {
+    const _trace = debug('img:get_image_ext')
     try {
-        const ext = content_type.split('/').pop()
-        if (ext != 'jpg' || ext != 'jpeg' || ext != 'png' || ext != 'gif' || ext != 'bmp')
+        let ext = content_type.split('/').pop()
+        if (ext != 'jpg' || ext != 'png' || ext != 'gif' || ext != 'bmp')
             ext = 'jpg'
+
+        _trace("Done, ext :%s", ext)
         return ext
     } catch (err) {
+        _trace("Err: %O", err)
         return null
     }
 }
 
 function push_image_to_scanner_queue(image_raw_url, image_path) {
-    const task = `${image_path}${options.seq}${image_raw_url}`
+    const task = `${image_path}${options.sep}${image_raw_url}`
     client.lpush(options.key_scanning, task, (err, ret) => {
         if (err) console.log(err)
     })
+}
+
+async function write_image_file(image_url, image_ext, image_data) {
+    const image_file_name = tools.md5(image_url) + "." + image_ext
+    const image_file_path = path.join(IMAGE_DATA_PATH, image_file_name)
+    await fs.writeFile(image_file_path, image_data)
+    return image_file_path
+}
+
+async function get_image_cached(image_url) {
+    const cached_file_path = path.join(IMAGE_CACHE_PATH, tools.md5(image_url) + '.meta')
+    const exists = await fs.pathExists(cached_file_path)
+    if (!exists)
+        return false
+
+    const score = await fs.readFile(cached_file_path)
+    return Number(score) < 0.8
+}
+
+async function cache_image(image_url) {
+    const cache_file_name = tools.md5(image_url) + `.meta`
+    const cache_file_path = path.join(IMAGE_CACHE_PATH, cache_file_name)
+    await fs.writeFile(cache_file_path, '0')
 }

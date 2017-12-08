@@ -16,5 +16,5 @@ module.exports = {
 
     xlsx_file: path.join(__dirname, 'url.xlsx'),
 
-    data_path: path.join('../data'),
+    data_path: path.resolve('/mnt/data'),
 }

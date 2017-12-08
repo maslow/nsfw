@@ -18,9 +18,9 @@ module.exports = {
 function get_user_agent() {
     return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36'
 }
-function md5(str) {
+function md5(data) {
     return crypto.createHash('md5')
-        .update(str)
+        .update(data)
         .digest('hex')
 }
 function resolve_url(strurl, originalUrl) {

@@ -119,7 +119,7 @@ def main(argv):
                 time.sleep(1)
                 continue
 
-            image_path = ret.split("#_#")[4]
+            image_path = ret.split("___$$$___")[0]
             image_data = open(image_path).read()
             
             # Classify.
@@ -128,8 +128,11 @@ def main(argv):
             # Scores is the array containing SFW / NSFW image probabilities
             # scores[1] indicates the NSFW probability
             print "%d. score: %f, path: %s" % (complete, scores[1], image_path)
-            if scores[1] > 0.9:
-                redis_server.lpush("illegal.list", "%s#_#%f" % (ret, scores[1])) 
+
+            if scores[1] > 0.8:
+                image_cached_path = image_path.replace('images', 'images.cache')
+                open(image_cached_path, "w+").write(str(scores[1]))
+                redis_server.lpush("illegal.list", "%s#_#%f" % (ret, scores[1]))
 
         except Exception, e:
             print 'Error : ', e
