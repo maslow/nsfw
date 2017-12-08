@@ -133,7 +133,7 @@ def main(argv):
                 image_cached_path = image_path.replace('images', 'images.cache')
                 image_cached_path = image_cached_path.replace('.jpg', '.meta')
                 open(image_cached_path, "w+").write(str(scores[1]))
-                redis_server.lpush("illegal.list", "%s#_#%f" % (ret, scores[1]))
+                redis_server.lpush("illegal.list", "%f___$$$___%s" % (scores[1], ret))
 
         except Exception, e:
             print 'Error : ', e

@@ -35,9 +35,9 @@ async function main() {
         }
         i++
         try_times = 0
-        let [imgUrlHash, url1, url2, imgUrl, imgPath, score] = ret.split('#_#')
-        let newPath = await copyImageFile(url1, imgPath)
-        let row = `${i} $ ${imgUrlHash} $ ${url1} $ ${url2} $ ${imgUrl} $ ${imgPath} $ ${score} $ ${newPath}`
+        let [score, imgPath] = ret.split(options.sep)
+        let newPath = await copyImageFile(imgPath)
+        let row = `${i}${options.sep}${ret}`
         console.log(row)
         imglogger.log(row)
         client.lpush('illegal.list.backup', ret)
@@ -45,8 +45,8 @@ async function main() {
 }
 
 
-async function copyImageFile(url1, imgPath){
-    let dest = `${dataPath}/report/images/${url1}`
+async function copyImageFile(imgPath){
+    let dest = `${dataPath}/report/images/`
     await fs.ensureDirAsync(dest)
     let basename = path.basename(imgPath)
     let filepath = path.join(`${dest}`, `${basename}`)
