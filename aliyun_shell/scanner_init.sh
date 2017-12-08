@@ -1,7 +1,13 @@
 #!/bin/sh
+
+# You HAVE TO replace the value with your real ip addr.
 export REDIS_HOST=172.17.216.196
 
+yum install -y nfs-utils docker rpcbind git
+systemctl start docker
+
 # update codes
+# cd ~ && git clone https://github.com/Maslow/nsfw.git
 cd /root/nsfw && git pull origin master
 
 # mount nfs from $REDIS_HOST

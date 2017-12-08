@@ -31,5 +31,6 @@
     node img.js  # download images
 
     # In a meanwhile, let scanner go (open_nsfw)
-    docker run -d -v ~/nsfw/open_nsfw:/workspace -v /mnt:/mnt --link redis.server -e REDIS_HOST=redis.server --name scanner bvlc/caffe:cpu sh run.sh
+    docker run -d -v ~/nsfw/open_nsfw:/workspace -v /mnt:/mnt --link redis.server \
+    -e REDIS_HOST=redis.server --name scanner bvlc/caffe:cpu sh run.sh
 ```
