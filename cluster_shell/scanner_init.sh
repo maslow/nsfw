@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # You HAVE TO replace the value with your real ip addr.
-export REDIS_HOST=172.17.216.196
+export REDIS_HOST=172.17.216.245
 
 yum install -y nfs-utils docker rpcbind git
 systemctl start docker
