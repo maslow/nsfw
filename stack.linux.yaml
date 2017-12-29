@@ -17,7 +17,7 @@ services:
     environment:
       REDIS_HOST: redis
     working_dir: /app
-    command: node url.js
+    command: node url.js -c 1000 -w 1000
     deploy:
       replicas: 1
     volumes:
@@ -28,7 +28,7 @@ services:
     environment:
       REDIS_HOST: redis
     working_dir: /app
-    command: node img.js
+    command: node img.js -c 1000 -w 1000
     deploy:
       replicas: 1
     volumes:
@@ -44,6 +44,17 @@ services:
       replicas: 1
     volumes:
       - /mnt/data:/mnt/data
+
+  visualizer:
+    image: dockersamples/visualizer:stable
+    ports:
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
 
 volumes:
   redis-data:
