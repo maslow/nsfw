@@ -1,14 +1,15 @@
 const path = require('path')
 
-redis_host = process.env['REDIS_HOST'] || '127.0.0.1'
+const REDIS_HOST = process.env['REDIS_HOST'] || '127.0.0.1'
+const DEPTH = process.env['DEPTH'] || 2
 
 module.exports = {
     redis: {
-        host: redis_host,
+        host: REDIS_HOST,
         port: 6379
     },
     sep: '___$$$___',
-    depth: 2,
+    depth: DEPTH,
     
     key_scanning: 'img.scanning',
     key_url: 'url',
