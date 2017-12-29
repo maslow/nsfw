@@ -21,7 +21,7 @@ services:
     deploy:
       replicas: 1
     volumes:
-      - /mnt/data:/mnt/data
+      - ../data:/mnt/data
 
   img:
     image: registry.cn-beijing.aliyuncs.com/maslow/nsfw_spider
@@ -32,7 +32,7 @@ services:
     deploy:
       replicas: 1
     volumes:
-      - /mnt/data:/mnt/data
+      - ../data:/mnt/data
 
   scanner:
     image: registry.cn-beijing.aliyuncs.com/maslow/nsfw_scanner
@@ -43,7 +43,7 @@ services:
     deploy:
       replicas: 1
     volumes:
-      - /mnt/data:/mnt/data
+      - ../data:/mnt/data
 
 volumes:
   redis-data:
