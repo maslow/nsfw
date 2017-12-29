@@ -12,7 +12,7 @@ services:
     volumes:
       - redis-data:/data
 
-  spider-url:
+  url:
     image: registry.cn-beijing.aliyuncs.com/maslow/nsfw_spider
     environment:
       REDIS_HOST: redis
@@ -21,9 +21,9 @@ services:
     deploy:
       replicas: 1
     volumes:
-      - ./data:/mnt/data
+      - /mnt/data:/mnt/data
 
-  spider-img:
+  img:
     image: registry.cn-beijing.aliyuncs.com/maslow/nsfw_spider
     environment:
       REDIS_HOST: redis
@@ -32,7 +32,18 @@ services:
     deploy:
       replicas: 1
     volumes:
-      - ./data:/mnt/data
+      - /mnt/data:/mnt/data
+
+  scanner:
+    image: registry.cn-beijing.aliyuncs.com/maslow/nsfw_scanner
+    environment:
+      REDIS_HOST: redis
+    working_dir: /app
+    command: python classify_nsfw.py
+    deploy:
+      replicas: 1
+    volumes:
+      - /mnt/data:/mnt/data
 
 volumes:
   redis-data:

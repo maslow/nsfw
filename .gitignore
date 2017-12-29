@@ -61,3 +61,4 @@ data
 data/*
 
 yarn.lock
+.DS_Store
