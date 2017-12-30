@@ -1,6 +1,12 @@
 #!/bin/sh
+yum install -y yum-utils device-mapper-persistent-data \
+  lvm2 nfs-utils rpcbind git
 
-yum install -y nfs-utils rpcbind docker git
+yum-config-manager \
+    --add-repo \
+    https://download.docker.com/linux/centos/docker-ce.repo
+
+yum install -y docker-ce
 
 # !!!export /mnt as nfs folder!!!
 # refer to [http://www.linuxidc.com/Linux/2015-05/117378.htm]
@@ -29,6 +35,8 @@ cd /root/nsfw && git pull origin master
 
 # install the dependencies
 cd /root/nsfw/spider && npm install --registry=https://registry.npm.taobao.org
+
+mkdir /mnt/data
 
 # run redis service
 docker run -d -p 6379:6379 -v /mnt/redis-data:/data --name redis.server redis
