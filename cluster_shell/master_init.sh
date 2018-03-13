@@ -16,9 +16,10 @@ echo "/mnt 172.17.*.*(rw,no_root_squash,no_all_squash,sync,anonuid=501,anongid=5
 exportfs -r
 
 # apply aliyun docker images hub mirror
+mkdir -p /etc/docker
 tee /etc/docker/daemon.json <<-'EOF'
 {
-  "registry-mirrors": ["https://cx0p8tmg.mirror.aliyuncs.com"]
+  "registry-mirrors": ["https://0ndtep40.mirror.aliyuncs.com"]
 }
 EOF
 
@@ -28,8 +29,12 @@ systemctl start nfs
 systemctl start docker
 
 # install nodejs
-curl --silent --location https://rpm.nodesource.com/setup_8.x | sudo bash -
-sudo yum -y install nodejs
+curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.33.8/install.sh | bash
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+nvm install 8
+nvm use 8
 
 # download codes
 cd ~ && git clone https://github.com/Maslow/nsfw.git
@@ -44,3 +49,9 @@ docker swarm init > /root/join.sh
 
 # deploy services
 docker stack deploy -c stack.linux.yaml nsfw
+
+# import 1st-layer urls
+sleep 60s
+cd /root/nsfw/spider && node import.js
+
+cat /root/join.sh

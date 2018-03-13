@@ -14,17 +14,27 @@
     2. spider_init.sh, 爬虫节点部署
     3. scanner_init.sh, 扫描节点部署
 
-# Cluster Deployment (Based on Doker swarm)
-  - Master
+# Cluster Deployment (集群部署)
+  - Master节点配置
     1. 运行master_init.sh中的脚本，初始化环境
-    2. 执行 ```docker swarm init```，并记下返回的token
+    2. 运行cat /root/join.sh，拷贝下来docker swarm join指令
 
-  - Node节点
-    1. 将Master的token，更新到node_init.sh脚本最后一行
+  - Node节点配置
+    0. 将Master的内网地址更新到node_init.sh脚本的第三行
+    1. 将Master的docker swarm join指令，更新到node_init.sh脚本最后一行
     2. 执行node_init.sh（在申请机器的时候，直接在阿里云控制台拷入脚本，批量执行）
 
+> 任务调度
+```sh
+  docker service ls  # 查看正在运行的服务列表
+  docker service scale nsfw_url=10  # 将nsfw_url服务在集群中扩展到10个
+  docker service scale nsfw_img=10  # 将nsfw_img服务在集群中扩展到10个
+  docker service scale nsfw_scanner=10  # 将nsfw_scanner服务在集群中扩展到10个
+  
+  #!!!切记!!!  不要对nsfw_redis进行伸缩操作，它是单一数据节点部署的，没有分布式部署
+```
 
-# Environment Preparation (Local Host)
+# Environment Preparation (单机本地部署)
 ```shell
     # Install these (node version >= 8.x)
     yum install -y docker nodejs git
