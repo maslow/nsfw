@@ -20,6 +20,9 @@ services:
     command: node url.js -c 1000 -w 1000
     deploy:
       replicas: 1
+      placement:
+        constraints:
+          - node.role != manager
     volumes:
       - /mnt/data:/mnt/data
 
@@ -31,6 +34,9 @@ services:
     command: node img.js -c 1000 -w 1000
     deploy:
       replicas: 1
+      placement:
+        constraints:
+          - node.role != manager
     volumes:
       - /mnt/data:/mnt/data
 
