@@ -48,7 +48,7 @@ mkdir /mnt/data
 docker swarm init > /root/join.sh
 
 # deploy services
-docker stack deploy -c stack.linux.yaml nsfw
+cd /root/nsfw/ && docker stack deploy -c stack.linux.yaml nsfw
 
 # import 1st-layer urls
 sleep 60s
