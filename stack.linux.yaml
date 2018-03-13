@@ -13,7 +13,7 @@ services:
       - redis-data:/data
 
   url:
-    image: registry-vpc.cn-beijing.aliyuncs.com/maslow/nsfw_spider
+    image: registry.cn-beijing.aliyuncs.com/maslow/nsfw_spider
     environment:
       REDIS_HOST: redis
     working_dir: /app
@@ -24,7 +24,7 @@ services:
       - /mnt/data:/mnt/data
 
   img:
-    image: registry-vpc.cn-beijing.aliyuncs.com/maslow/nsfw_spider
+    image: registry.cn-beijing.aliyuncs.com/maslow/nsfw_spider
     environment:
       REDIS_HOST: redis
     working_dir: /app
@@ -35,7 +35,7 @@ services:
       - /mnt/data:/mnt/data
 
   scanner:
-    image: registry-vpc.cn-beijing.aliyuncs.com/maslow/nsfw_scanner
+    image: registry.cn-beijing.aliyuncs.com/maslow/nsfw_scanner
     environment:
       REDIS_HOST: redis
     working_dir: /app
