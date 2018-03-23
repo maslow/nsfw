@@ -13,7 +13,7 @@ services:
       - redis-data:/data
 
   url:
-    image: registry.cn-beijing.aliyuncs.com/maslow/nsfw_spider
+    build: ./spider
     environment:
       REDIS_HOST: redis
     working_dir: /app
@@ -21,10 +21,11 @@ services:
     deploy:
       replicas: 1
     volumes:
-      - ../data:/mnt/data
+      - ./spider:/app
+      - data:/mnt/data
 
   img:
-    image: registry.cn-beijing.aliyuncs.com/maslow/nsfw_spider
+    build: ./spider
     environment:
       REDIS_HOST: redis
     working_dir: /app
@@ -32,10 +33,11 @@ services:
     deploy:
       replicas: 1
     volumes:
-      - ../data:/mnt/data
+      - ./spider:/app
+      - data:/mnt/data
 
   scanner:
-    image: registry.cn-beijing.aliyuncs.com/maslow/nsfw_scanner
+    build: ./open_nsfw
     environment:
       REDIS_HOST: redis
     working_dir: /app
@@ -43,18 +45,20 @@ services:
     deploy:
       replicas: 1
     volumes:
-      - ../data:/mnt/data
+      - ./open_nsfw:/app
+      - data:/mnt/data
 
-  visualizer:
-    image: dockersamples/visualizer:stable
+  portainer:
+    image: portainer/portainer
+    command: ["-H", "unix:///var/run/docker.sock"]
     ports:
-      - "8080:8080"
+      - "9000:9000"
     volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock"
-    deploy:
-      placement:
-        constraints:
-          - node.role == manager
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer-data:/data
+
 
 volumes:
   redis-data:
+  portainer-data:
+  data:
