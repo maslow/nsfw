@@ -78,9 +78,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer-data:/data
-    networks:
-      - backend
 
 volumes:
   redis-data:
-   portainer-data:
+  portainer-data:
