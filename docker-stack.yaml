@@ -83,3 +83,4 @@ services:
 
 volumes:
   redis-data:
+   portainer-data:
